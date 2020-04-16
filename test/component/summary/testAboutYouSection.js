@@ -3,8 +3,9 @@
 const requireDir = require('require-directory');
 const TestWrapper = require('test/util/TestWrapper');
 const applicantData = require('test/data/applicant');
+const languageContent = require('../../../app/resources/en/translation/language');
 const applicantContent = requireDir(module, '../../../app/resources/en/translation/applicant');
-const config = require('app/config');
+const config = require('config');
 const basePath = config.app.basePath;
 
 describe('summary-about-you-section', () => {
@@ -28,11 +29,13 @@ describe('summary-about-you-section', () => {
                         throw err;
                     }
 
-                    const playbackData = {};
-                    playbackData.name = applicantContent.name.firstName;
-                    playbackData.name = applicantContent.name.lastName;
-                    playbackData.emailAddress = applicantContent.email.question;
-                    playbackData.applicantAddress = applicantContent.address.question;
+                    const playbackData = {
+                        bilingual: languageContent.question,
+                        firstName: applicantContent.name.firstName,
+                        lastName: applicantContent.name.lastName,
+                        emailAddress: applicantContent.email.question,
+                        applicantAddress: applicantContent.address.question
+                    };
 
                     testWrapper.testDataPlayback(done, playbackData);
                 });
@@ -46,17 +49,18 @@ describe('summary-about-you-section', () => {
                         throw err;
                     }
 
-                    const playbackData = {};
-                    playbackData.firstName = applicantContent.name.firstName;
-                    playbackData.name = applicantContent.name.lastName;
-                    playbackData.emailAddress = applicantContent.email.question;
-                    playbackData.applicantAddress = applicantContent.address.question;
+                    const playbackData = {
+                        bilingual: languageContent.question,
+                        firstName: applicantContent.name.firstName,
+                        lastName: applicantContent.name.lastName,
+                        emailAddress: applicantContent.email.question,
+                        applicantAddress: applicantContent.address.question
+                    };
 
                     Object.assign(playbackData, applicantData.applicant);
                     playbackData.address = applicantData.applicant.address.formattedAddress;
                     testWrapper.testDataPlayback(done, playbackData);
                 });
         });
-
     });
 });

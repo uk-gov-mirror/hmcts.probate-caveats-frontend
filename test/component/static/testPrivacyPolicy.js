@@ -1,7 +1,7 @@
 'use strict';
 
 const TestWrapper = require('test/util/TestWrapper');
-const config = require('app/config');
+const config = require('config');
 
 describe('privacy-policy', () => {
     let testWrapper;
@@ -27,7 +27,7 @@ describe('privacy-policy', () => {
                 informationCommissionersOfficeLink: config.links.informationCommissionersOffice
             };
 
-            testWrapper.testContent(done, [], contentData);
+            testWrapper.testContent(done, contentData);
         });
     });
 });

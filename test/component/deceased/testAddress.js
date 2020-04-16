@@ -1,14 +1,14 @@
 'use strict';
 
 const TestWrapper = require('test/util/TestWrapper');
-const Summary = require('app/steps/ui/summary/index');
-const testHelpBlockContent = require('test/component/common/testHelpBlockContent.js');
-const config = require('app/config');
+const Language = require('app/steps/ui/language/index');
+const testCommonContent = require('test/component/common/testCommonContent.js');
+const config = require('config');
 const basePath = config.app.basePath;
 
 describe('deceased-address', () => {
     let testWrapper;
-    const expectedNextUrlForSummary = basePath + Summary.getUrl();
+    const expectedNextUrlForLanguage = basePath + Language.getUrl();
 
     beforeEach(() => {
         testWrapper = new TestWrapper('DeceasedAddress');
@@ -19,10 +19,10 @@ describe('deceased-address', () => {
     });
 
     describe('Verify Content, Errors and Redirection', () => {
-        testHelpBlockContent.runTest('DeceasedAddress');
+        testCommonContent.runTest('DeceasedAddress');
 
         it('test right content loaded on the page', (done) => {
-            const excludeContent = ['selectAddress'];
+            const contentToExclude = ['selectAddress'];
             const sessionData = {
                 applicant: {
                     firstName: 'value'
@@ -37,7 +37,8 @@ describe('deceased-address', () => {
                 .send(sessionData)
                 .end(() => {
                     const contentData = {deceasedName: 'Jason Smith'};
-                    testWrapper.testContent(done, excludeContent, contentData);
+
+                    testWrapper.testContent(done, contentData, contentToExclude);
                 });
         });
 
@@ -47,14 +48,13 @@ describe('deceased-address', () => {
             testWrapper.testErrors(done, data, 'required', ['addressLine1', 'postTown', 'newPostCode']);
         });
 
-        it(`test it redirects to summary page: ${expectedNextUrlForSummary}`, (done) => {
+        it(`test it redirects to language page: ${expectedNextUrlForLanguage}`, (done) => {
             const data = {
                 addressLine1: 'value',
                 postTown: 'value',
                 newPostCode: 'value'
             };
-            testWrapper.testRedirect(done, data, expectedNextUrlForSummary);
+            testWrapper.testRedirect(done, data, expectedNextUrlForLanguage);
         });
-
     });
 });

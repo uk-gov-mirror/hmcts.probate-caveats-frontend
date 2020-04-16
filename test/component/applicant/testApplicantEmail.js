@@ -2,8 +2,8 @@
 
 const TestWrapper = require('test/util/TestWrapper');
 const ApplicantAddress = require('app/steps/ui/applicant/address/index');
-const testHelpBlockContent = require('test/component/common/testHelpBlockContent.js');
-const config = require('app/config');
+const testCommonContent = require('test/component/common/testCommonContent.js');
+const config = require('config');
 const basePath = config.app.basePath;
 
 describe('applicant-email', () => {
@@ -19,7 +19,7 @@ describe('applicant-email', () => {
     });
 
     describe('Verify Content, Errors and Redirection', () => {
-        testHelpBlockContent.runTest('ApplicantEmail');
+        testCommonContent.runTest('ApplicantEmail');
 
         it('test content loaded on the page', (done) => {
             const sessionData = {applicant: {firstName: 'value'}};

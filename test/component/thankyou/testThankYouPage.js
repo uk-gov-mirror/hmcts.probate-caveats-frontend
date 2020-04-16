@@ -1,9 +1,10 @@
 'use strict';
 
 const TestWrapper = require('test/util/TestWrapper');
-const config = require('app/config');
+const config = require('config');
 const basePath = config.app.basePath;
 const content = require('app/resources/en/translation/thankyou');
+const commonContent = require('app/resources/en/translation/common');
 
 describe('thank-you', () => {
     let testWrapper;
@@ -40,16 +41,17 @@ describe('thank-you', () => {
                     state: 'CaseCreated'
                 }
             };
+
             testWrapper.agent.post(`${basePath}/prepare-session/form`)
                 .send(sessionData)
                 .end(() => {
                     const contentData = {
-                        helpLineNumber: config.helpline.number,
-                        findOutNext: config.links.findOutNext,
+                        helpLineNumber: commonContent.helpTelephoneNumber,
+                        helpLineHours: commonContent.helpTelephoneOpeningHours,
                         citizenAdvice: config.links.citizenAdvice
                     };
 
-                    testWrapper.testContent(done, [], contentData);
+                    testWrapper.testContent(done, contentData);
                 });
         });
     });

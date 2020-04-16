@@ -8,12 +8,11 @@ const express = require('express');
 const rewrite = require('express-urlrewrite');
 const session = require('express-session');
 const nunjucks = require('nunjucks');
-const filters = require('app/components/filters.js');
 const routes = require(`${__dirname}/app/routes`);
 const favicon = require('serve-favicon');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-const config = require(`${__dirname}/app/config`);
+const config = require('config');
 const utils = require(`${__dirname}/app/components/utils`);
 const packageJson = require(`${__dirname}/package`);
 const helmet = require('helmet');
@@ -22,11 +21,11 @@ const healthcheck = require(`${__dirname}/app/healthcheck`);
 const fs = require('fs');
 const https = require('https');
 const appInsights = require('applicationinsights');
-const commonContent = require('app/resources/en/translation/common');
 const uuidv4 = require('uuid/v4');
 const uuid = uuidv4();
+const isEmpty = require('lodash').isEmpty;
 
-exports.init = function() {
+exports.init = function(isA11yTest = false, a11yTestSession = {}) {
     const app = express();
     const port = config.app.port;
     const releaseVersion = packageJson.version;
@@ -41,14 +40,15 @@ exports.init = function() {
     app.set('view engine', 'html');
     app.set('views', ['app/steps', 'app/views']);
 
+    const isDev = app.get('env') === 'development';
+
     const njkEnv = nunjucks.configure([
         'app/steps',
         'app/views',
         'node_modules/govuk-frontend/'
     ], {
-        autoescape: true,
-        watch: true,
-        noCache: true
+        noCache: isDev,
+        express: app
     });
 
     const globals = {
@@ -56,7 +56,6 @@ exports.init = function() {
         gaTrackingId: config.gaTrackingId,
         enableTracking: config.enableTracking,
         links: config.links,
-        helpline: config.helpline,
         applicationFee: config.payment.applicationFee,
         nonce: uuid,
         basePath: config.app.basePath,
@@ -69,9 +68,6 @@ exports.init = function() {
         }
     };
     njkEnv.addGlobal('globals', globals);
-
-    filters(njkEnv);
-    njkEnv.express(app);
 
     app.use(rewrite(`${globals.basePath}/public/*`, '/public/$1'));
 
@@ -135,7 +131,7 @@ exports.init = function() {
     const caching = {cacheControl: true, setHeaders: (res) => res.setHeader('Cache-Control', 'max-age=604800')};
 
     // Middleware to serve static assets
-    app.use(`${config.app.basePath}/webchat`, express.static(`${__dirname}/node_modules/@hmcts/ctsc-web-chat/assets`, caching));
+    app.use('/public/webchat', express.static(`${__dirname}/node_modules/@hmcts/ctsc-web-chat/assets`, caching));
     app.use('/public/stylesheets', express.static(`${__dirname}/public/stylesheets`, caching));
     app.use('/public/images', express.static(`${__dirname}/app/assets/images`, caching));
     app.use('/public/javascripts/govuk-frontend', express.static(`${__dirname}/node_modules/govuk-frontend`, caching));
@@ -174,18 +170,39 @@ exports.init = function() {
     }));
 
     app.use((req, res, next) => {
+        if (!req.session) {
+            return next(new Error('Unable to reach redis'));
+        }
+
+        if (isA11yTest && !isEmpty(a11yTestSession)) {
+            req.session = Object.assign(req.session, a11yTestSession);
+        }
+
+        next();
+    });
+
+    app.use((req, res, next) => {
         req.session.cookie.secure = req.protocol === 'https';
         next();
     });
 
     app.use((req, res, next) => {
-        if (!req.session) {
-            return next(new Error('Unable to reach redis'));
+        if (!req.session.language) {
+            req.session.language = 'en';
         }
-        next(); // otherwise continue
+
+        if (req.query && req.query.locale && config.languages.includes(req.query.locale)) {
+            req.session.language = req.query.locale;
+        }
+
+        if (isA11yTest && !isEmpty(a11yTestSession)) {
+            req.session = Object.assign(req.session, a11yTestSession);
+        }
+
+        next();
     });
 
-    if (config.useCSRFProtection === 'true') {
+    if (config.app.useCSRFProtection === 'true') {
         app.use(csrf(), (req, res, next) => {
             res.locals.csrfToken = req.csrfToken();
             next();
@@ -194,6 +211,8 @@ exports.init = function() {
 
     // Add variables that are available in all views
     app.use(function (req, res, next) {
+        const commonContent = require(`app/resources/${req.session.language}/translation/common`);
+
         res.locals.serviceName = commonContent.serviceName;
         res.locals.cookieText = commonContent.cookieText;
         res.locals.releaseVersion = 'v' + releaseVersion;
@@ -242,13 +261,19 @@ exports.init = function() {
     }
 
     app.all('*', (req, res) => {
+        const commonContent = require(`app/resources/${req.session.language}/translation/common`);
+        const content = require(`app/resources/${req.session.language}/translation/errors/404`);
+
         logger(req.sessionID).error(`Unhandled request ${req.url}`);
-        res.status(404).render('errors/404');
+        res.status(404).render('errors/error', {common: commonContent, content: content, error: '404'});
     });
 
     app.use((err, req, res, next) => {
+        const commonContent = require(`app/resources/${req.session.language}/translation/common`);
+        const content = require(`app/resources/${req.session.language}/translation/errors/500`);
+
         logger(req.sessionID).error(err);
-        res.status(500).render('errors/500');
+        res.status(500).render('errors/error', {common: commonContent, content: content, error: '500'});
     });
 
     return {app, http};

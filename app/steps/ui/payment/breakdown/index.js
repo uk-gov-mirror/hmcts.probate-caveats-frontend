@@ -2,60 +2,69 @@
 
 const Step = require('app/core/steps/Step');
 const FieldError = require('app/components/error');
-const config = require('app/config');
 const {get, set} = require('lodash');
 const logger = require('app/components/logger');
 const logInfo = (message, applicationId = 'Unknown') => logger(applicationId).info(message);
 const services = require('app/components/services');
 const security = require('app/components/security');
 const formatUrl = require('app/utils/FormatUrl');
+const FeesLookup = require('app/utils/FeesLookup');
 
 class PaymentBreakdown extends Step {
     static getUrl() {
         return '/payment-breakdown';
     }
 
-    nextStepUrl(req, ctx) {
-        return config.app.basePath + this.next(req, ctx).constructor.getUrl();
-    }
-
-    generateFields(ctx, errors) {
-        const fields = super.generateFields(ctx, errors);
-        set(fields, 'applicationFee.value', config.payment.applicationFee);
-        return fields;
-    }
-
     getContextData(req) {
         const ctx = super.getContextData(req);
         const formdata = req.session.form;
+
         ctx.deceasedLastName = get(formdata.deceased, 'lastName', '');
-        ctx.total = config.payment.applicationFee;
-        ctx.applicationFee = config.payment.applicationFee;
         ctx.hostname = formatUrl.createHostname(req);
         ctx.applicationId = get(formdata, 'applicationId');
+        ctx.authToken = req.authToken;
         return ctx;
     }
 
-    handleGet(ctx) {
+    handleGet(ctx, formdata) {
+        const fees = formdata.fees;
+        this.checkFeesStatus(fees);
+
+        ctx.applicationFee = parseFloat(fees.total).toFixed(2);
+        ctx.total = parseFloat(fees.total).toFixed(2);
         return [ctx, ctx.errors];
+    }
+
+    checkFeesStatus(fees) {
+        if (fees.status !== 'success') {
+            throw new Error('Unable to calculate fees from Fees Api');
+        }
     }
 
     * handlePost(ctx, errors, formdata, session, hostname) {
         // this is required since this page is re-entrant for failues on /payment-status
         this.nextStepUrl = () => this.next(ctx).constructor.getUrl();
 
-        set(formdata, 'payment.total', ctx.total);
-
         try {
+            const feesLookup = new FeesLookup(formdata.applicationId, hostname);
+            const confirmFees = yield feesLookup.lookup(ctx.authToken);
+            this.checkFeesStatus(confirmFees);
+            const originalFees = formdata.fees;
+            if (confirmFees.total !== originalFees.total) {
+                throw new Error(`Error calculated fees totals have changed from ${originalFees.total} to ${confirmFees.total}`);
+            }
+            ctx.total = originalFees.total;
+            ctx.applicationFee = originalFees.total;
+
             // Setup security tokens
-            yield this.setCtxWithSecurityTokens(ctx, errors);
+            yield this.setCtxWithSecurityTokens(ctx, errors, session.language);
             if (errors.length > 0) {
                 return [ctx, errors];
             }
 
             // If we dont already have a case so create one
             if (!formdata.ccdCase || !formdata.ccdCase.id) {
-                const result = yield this.sendToOrchestrationService(ctx, formdata, errors);
+                const result = yield this.sendToOrchestrationService(ctx, formdata, errors, session.language);
                 if (errors.length > 0) {
                     return [ctx, errors];
                 }
@@ -66,7 +75,7 @@ class PaymentBreakdown extends Step {
             // create payment
             const ccdCaseId = get(formdata.ccdCase, 'id');
             const data = {
-                amount: parseFloat(ctx.total),
+                amount: ctx.total,
                 authToken: ctx.authToken,
                 serviceAuthToken: ctx.serviceAuthToken,
                 userId: ctx.userId,
@@ -76,10 +85,10 @@ class PaymentBreakdown extends Step {
                 ccdCaseId: ccdCaseId,
                 applicationId: ctx.applicationId
             };
-            const paymentResponse = yield services.createPayment(data, hostname);
+            const paymentResponse = yield services.createPayment(data, hostname, session.language);
             logInfo(`New Payment reference: ${paymentResponse.reference}`, formdata.applicationId);
             if (paymentResponse.name === 'Error') {
-                errors.push(FieldError('payment', 'failure', this.resourcePath, ctx));
+                errors.push(FieldError('payment', 'failure', this.resourcePath, ctx, session.language));
                 return [ctx, errors];
             }
 
@@ -105,28 +114,28 @@ class PaymentBreakdown extends Step {
         session.save();
     }
 
-    * setCtxWithSecurityTokens(ctx, errors) {
+    * setCtxWithSecurityTokens(ctx, errors, language) {
         const serviceAuthResult = yield services.authorise(ctx.applicationId);
         if (serviceAuthResult.name === 'Error') {
             logInfo('failed to obtain serviceAuthToken', ctx.applicationId);
-            errors.push(FieldError('authorisation', 'failure', this.resourcePath, ctx));
+            errors.push(FieldError('authorisation', 'failure', this.resourcePath, ctx, language));
             return;
         }
         const authToken = yield security.getUserToken(ctx.hostname, ctx.applicationId);
         if (authToken.name === 'Error') {
             logInfo('failed to obtain authToken', ctx.applicationId);
-            errors.push(FieldError('authorisation', 'failure', this.resourcePath, ctx));
+            errors.push(FieldError('authorisation', 'failure', this.resourcePath, ctx, language));
             return;
         }
         set(ctx, 'serviceAuthToken', serviceAuthResult);
         set(ctx, 'authToken', authToken);
     }
 
-    * sendToOrchestrationService(ctx, formdata, errors) {
+    * sendToOrchestrationService(ctx, formdata, errors, language) {
         const result = yield services.sendToOrchestrationService(formdata, ctx);
         if (result.name === 'Error') {
             logInfo('Failed to create case', formdata.applicationId);
-            errors.push(FieldError('submit', 'failure', this.resourcePath, ctx));
+            errors.push(FieldError('submit', 'failure', this.resourcePath, ctx, language));
             return;
         }
         logInfo(`Case created: ${result.ccdCase.id}`, formdata.applicationId);

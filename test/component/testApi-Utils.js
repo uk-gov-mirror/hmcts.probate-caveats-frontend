@@ -2,7 +2,7 @@
 
 const expect = require('chai').expect;
 const utils = require('app/components/api-utils');
-const config = require('app/config');
+const config = require('config');
 
 describe('api-utils', () => {
 
@@ -34,6 +34,5 @@ describe('api-utils', () => {
             expect(fetchOptions.body).to.equal(expectedFetchOptions.body);
             done();
         });
-
     });
 });

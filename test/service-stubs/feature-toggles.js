@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('app/config');
+const config = require('config');
 const express = require('express');
 const router = require('express').Router();
 const logger = require('app/components/logger')('Init');
@@ -8,9 +8,7 @@ const app = express();
 const featureTogglesPort = config.featureToggles.port;
 
 const featureToggles = {
-    'probate-caveats-fe-shutter': true,
-    'probate-caveats-webchat': true,
-    'probate-webforms': true
+    'probate-caveats-fe-shutter': false
 };
 
 Object.entries(featureToggles).forEach(([key, value]) => {

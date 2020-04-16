@@ -7,7 +7,7 @@ const deceasedData = require('test/data/deceased');
 const deceasedContent = requireDir(module, '../../../app/resources/en/translation/deceased');
 const summaryContent = require('app/resources/en/translation/summary');
 const FormatName = require('app/utils/FormatName');
-const config = require('app/config');
+const config = require('config');
 const basePath = config.app.basePath;
 
 describe('summary-deceased-section', () => {
@@ -29,6 +29,7 @@ describe('summary-deceased-section', () => {
                     firstName: 'value'
                 }
             };
+
             testWrapper.agent.post('/prepare-session/form')
                 .send(sessionData)
                 .end(() => {
@@ -40,6 +41,7 @@ describe('summary-deceased-section', () => {
                         dod: deceasedContent.dod.question,
                         address: deceasedContent.address.question.replace('{deceasedName}', ''),
                     };
+
                     testWrapper.testDataPlayback(done, playbackData);
                 });
         });
@@ -63,6 +65,7 @@ describe('summary-deceased-section', () => {
                     };
                     Object.assign(playbackData, deceasedData.deceased);
                     playbackData.address = deceasedData.deceased.address.formattedAddress;
+
                     testWrapper.testDataPlayback(done, playbackData);
                 });
         });
@@ -75,7 +78,7 @@ describe('summary-deceased-section', () => {
                 deceased: {
                     firstName: 'Joe',
                     lastName: 'Bloggs',
-                    alias: 'Yes',
+                    alias: 'optionYes',
                     otherNames: {
                         name_0: {
                             firstName: 'new_died_firstname',
@@ -99,6 +102,7 @@ describe('summary-deceased-section', () => {
                         othernamesfirstname: sessionData.deceased.otherNames.name_0.firstName,
                         othernameslastname: sessionData.deceased.otherNames.name_0.lastName
                     };
+
                     testWrapper.testDataPlayback(done, playbackData);
                 });
         });

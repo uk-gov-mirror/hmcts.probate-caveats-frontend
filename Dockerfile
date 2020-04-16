@@ -1,21 +1,19 @@
 # ---- Base image ----
-FROM node:8.15.1-stretch-slim as base
-RUN yarn config set proxy "$http_proxy" && yarn config set https-proxy "$https_proxy"
+
+FROM hmctspublic.azurecr.io/base/node:12-alpine as base
 
 ENV WORKDIR /opt/app
 WORKDIR ${WORKDIR}
 
-COPY package.json ./
-
-# Update & Install theses apps.
+COPY --chown=hmcts:hmcts package.json yarn.lock ./
+RUN yarn config set proxy "$http_proxy" && yarn config set https-proxy "$https_proxy"
 RUN yarn install --production  \
     && yarn cache clean
 
 # ---- Build image ----
 FROM base as build
-RUN apt-get update \
- && apt-get install --assume-yes git bzip2
-COPY . ./
+COPY --chown=hmcts:hmcts . ./
+
 RUN yarn install \
     && yarn setup \
     && rm -rf /opt/app/.git
@@ -23,7 +21,9 @@ RUN yarn install \
 # ---- Runtime image ----
 FROM base as runtime
 COPY --from=build ${WORKDIR}/app app/
+COPY --from=build ${WORKDIR}/config config/
 COPY --from=build ${WORKDIR}/public public/
 COPY --from=build ${WORKDIR}/server.js ${WORKDIR}/app.js ${WORKDIR}/git.properties.json ./
 EXPOSE 3000
 CMD ["yarn", "start" ]
+

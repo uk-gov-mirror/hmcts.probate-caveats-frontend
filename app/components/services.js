@@ -1,16 +1,18 @@
 'use strict';
 
 const utils = require('app/components/api-utils');
-const config = require('app/config');
+const config = require('config');
 const submitData = require('app/components/submit-data');
 const paymentData = require('app/components/payment-data');
 const OSPlacesClient = require('@hmcts/os-places-client').OSPlacesClient;
 const otp = require('otp');
 const FormatUrl = require('app/utils/FormatUrl');
+const {URLSearchParams} = require('url');
 const ORCHESTRATION_SERVICE_URL = config.services.orchestration.url;
 const CREATE_PAYMENT_SERVICE_URL = config.services.payment.createPaymentUrl;
 const POSTCODE_SERVICE_TOKEN = config.services.postcode.token;
 const SERVICE_AUTHORISATION_URL = `${config.services.idam.s2s_url}/lease`;
+const FEES_SERVICE_URL = config.services.feesRegister.url;
 const serviceName = config.services.idam.service_name;
 const externalHostNameUrl = config.externalHostNameUrl;
 const secret = config.services.idam.service_key;
@@ -75,18 +77,19 @@ const updateCcdCasePaymentStatus = (data, ctx) => {
     return utils.fetchJson(`${ORCHESTRATION_SERVICE_URL}/forms/${data.applicationId}/payments`, fetchOptions);
 };
 
-const createPayment = (data, hostname) => {
+const createPayment = (data, hostname, language) => {
     logInfo('createPayment', data.applicationId);
     logInfo('hostname', hostname);
     const paymentUpdatesCallback = config.services.orchestration.url + config.services.orchestration.paths.payment_updates;
+    const pay_return_host_url = (hostname.indexOf('.internal') >= 0) ? hostname:(externalHostNameUrl || hostname);
     const headers = {
         'Content-Type': 'application/json',
         'Authorization': data.authToken,
         'ServiceAuthorization': data.serviceAuthToken,
-        'return-url': FormatUrl.format((externalHostNameUrl || hostname), config.services.payment.returnUrlPath),
+        'return-url': FormatUrl.format(pay_return_host_url, config.services.payment.returnUrlPath),
         'service-callback-url': paymentUpdatesCallback
     };
-    const body = paymentData.createPaymentData(data);
+    const body = paymentData.createPaymentData(data, language);
     const fetchOptions = utils.fetchOptions(body, 'POST', headers);
     return utils.fetchJson(CREATE_PAYMENT_SERVICE_URL, fetchOptions);
 };
@@ -116,6 +119,19 @@ const authorise = (applicationId) => {
     return utils.fetchText(SERVICE_AUTHORISATION_URL, fetchOptions);
 };
 
+const feesLookup = (data, authToken, applicationId) => {
+    logInfo('get fee total', applicationId);
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': authToken
+    };
+
+    const params = new URLSearchParams(data);
+    const url = `${FEES_SERVICE_URL}${config.services.feesRegister.paths.feesLookup}?${params.toString()}`;
+    const fetchOptions = utils.fetchOptions({}, 'GET', headers);
+    return utils.fetchJson(url, fetchOptions);
+};
+
 module.exports = {
     findAddress,
     sendToOrchestrationService,
@@ -123,5 +139,6 @@ module.exports = {
     createPayment,
     findPayment,
     authorise,
-    featureToggle
+    featureToggle,
+    feesLookup
 };
