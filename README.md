@@ -21,7 +21,7 @@ Compile SASS stylesheets by running the following command:
 $ yarn setup
 ```
 
-Build a `git.properties.json` by running the following command:
+Build a `git.properties.json` by running the following command: 
 ```
 $ yarn git-info
 ```
