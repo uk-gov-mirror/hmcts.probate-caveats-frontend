@@ -32,12 +32,6 @@ withPipeline("nodejs", product, component) {
     sh 'yarn setup'
   }
 
-
-//  before('buildinfra:prod') {
-//     error 'Deliberately breaking pipeline to prevent prod deployment'
-//  }
-
-  installCharts()
   enableAksStagingDeployment()
   disableLegacyDeployment()
   loadVaultSecrets(secrets)
@@ -45,9 +39,9 @@ withPipeline("nodejs", product, component) {
   after('functionalTest:aat') {
       publishHTML target: [
 
-              reportDir            : "output/",
+              reportDir            : "functional-output/",
               reportFiles          : "mochawesome.html",
-              reportName           : "SAAT Functional Tests",
+              reportName           : "Caveat E2E Tests",
               alwaysLinkToLastBuild: true
       ]
   }

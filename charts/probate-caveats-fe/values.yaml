@@ -1,12 +1,16 @@
 nodejs:
   image: hmctspublic.azurecr.io/probate/caveats-fe:latest
   applicationPort: 3000
-  memoryRequests: "512Mi"
-  cpuRequests: "100m"
-  memoryLimits: "1024Mi"
-  cpuLimits: "500"
+  cpuLimits: 500m
+  cpuRequests: 100m
+  autoscaling:        # Default is false
+    enabled: true
+    maxReplicas: 5    # Required setting
+    targetCPUUtilizationPercentage: 80 # Default is 80% target CPU utilization
   aadIdentityName: probate
   environment:
+    NODE_ENV: "production"
+    NODE_PATH: "."
     PUBLIC_PROTOCOL: https
     USE_HTTPS: false
     REFORM_ENVIRONMENT: prod
@@ -19,13 +23,13 @@ nodejs:
     IDAM_S2S_URL: http://rpe-service-auth-provider-{{ .Values.global.environment }}.service.core-compute-{{ .Values.global.environment }}.internal
     PAYMENT_CREATE_URL: http://payment-api-{{ .Values.global.environment }}.service.core-compute-{{ .Values.global.environment }}.internal/card-payments
     ORCHESTRATION_SERVICE_URL: http://probate-orchestrator-service-{{ .Values.global.environment }}.service.core-compute-{{ .Values.global.environment }}.internal
-    FEATURE_TOGGLES_API_URL: http://rpe-feature-toggle-api-{{ .Values.global.environment }}.service.core-compute-{{ .Values.global.environment }}.internal
     APP_BASE_PATH: "/caveats"
     POSTCODE_SERVICE_PATH: "/caveats/find-address"
     PAY_RETURN_URL: "/caveats/payment-status"
     CAVEAT_REDIRECT_BASE_URL: http://probate-caveats-fe-{{ .Values.global.environment }}.service.core-compute-{{ .Values.global.environment }}.internal
   keyVaults:
     probate:
+      resourceGroup: probate
       secrets:
         - caveats-fe-redis-access-key
         - idam-s2s-secret
@@ -34,7 +38,6 @@ nodejs:
         - postcode-service-token2
         - probate-survey
         - probate-survey-end
-        - probate-application-fee-code
         - probate-service-id
         - probate-site-id
         - caveat-user-name
@@ -45,7 +48,8 @@ nodejs:
         - probate-webchat-button-busy
         - probate-webchat-button-service-closed
         - AppInsightsInstrumentationKey
-        - google-analytics-tracking-id-caveats
+        - launchdarkly-key
+        - pcq-token-key
 redis:
   cluster:
     enabled: false
@@ -55,15 +59,5 @@ redis:
     persistence:
       enabled: false
   enabled: false
-rpe-feature-toggle-api:
-  enabled: false
-#  image: hmcts.azurecr.io/hmcts/rpe-feature-toggle-api:latest
-  importer:
-    cron:
-      enabled: false
-    oneoff:
-      enabled: false
-  postgresql:
-    postgresqlDatabase: hmcts
 idam-pr:
   enabled: false

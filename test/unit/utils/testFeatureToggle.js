@@ -3,16 +3,12 @@
 const expect = require('chai').expect;
 const sinon = require('sinon');
 const rewire = require('rewire');
-const FeatureToggle = rewire('app/utils/FeatureToggle');
+const FeatureToggle = require('app/utils/FeatureToggle');
+const RewiredFeatureToggle = rewire('app/utils/FeatureToggle');
 
 describe('FeatureToggle', () => {
     describe('checkToggle()', () => {
         it('should call the callback function when the api returns successfully', (done) => {
-            const revert = FeatureToggle.__set__('FeatureToggleService', class {
-                get() {
-                    return Promise.resolve('true');
-                }
-            });
             const params = {
                 req: {
                     session: {
@@ -21,25 +17,42 @@ describe('FeatureToggle', () => {
                 },
                 res: {},
                 next: () => true,
-                featureToggleKey: 'document_upload',
+                redirectPage: '/dummy-page',
+                launchDarkly: {
+                    ftValue: {'ft_caveats_shutter': true}
+                },
+                featureToggleKey: 'ft_caveats_shutter',
                 callback: sinon.spy()
             };
             const featureToggle = new FeatureToggle();
 
-            featureToggle.checkToggle(params).then(() => {
-                expect(params.callback.calledOnce).to.equal(true);
-                expect(params.callback.firstCall.args[0].isEnabled).to.equal(true);
-                revert();
+            featureToggle.checkToggle(params);
+            featureToggle.checkToggle(params); // Checking a second call the ld doesn't hang
+
+            setTimeout(() => {
+                expect(params.callback.calledTwice).to.equal(true);
+                expect(params.callback.calledWith({
+                    req: params.req,
+                    res: params.res,
+                    next: params.next,
+                    redirectPage: params.redirectPage,
+                    isEnabled: true,
+                    featureToggleKey: params.featureToggleKey
+                })).to.equal(true);
+
                 done();
-            });
+            }, 1000);
         });
 
-        it('should call next() with an error when the api returns an error', (done) => {
-            const revert = FeatureToggle.__set__('FeatureToggleService', class {
-                get() {
-                    return Promise.resolve('false');
+        it('should call next() when the api returns an error', (done) => {
+            class FeatureToggleStub {
+                getInstance() {
+                    return true;
                 }
-            });
+                variation() {
+                    throw new Error('Test error');
+                }
+            }
             const params = {
                 req: {
                     session: {
@@ -48,17 +61,19 @@ describe('FeatureToggle', () => {
                 },
                 res: {},
                 next: sinon.spy(),
-                featureToggleKey: 'document_upload',
-                callback: sinon.spy()
+                redirectPage: '/dummy-page',
+                launchDarkly: {},
+                featureToggleKey: 'ft_fees_api',
+                callback: () => true
             };
-            const featureToggle = new FeatureToggle();
+            RewiredFeatureToggle.__set__('LaunchDarkly', FeatureToggleStub);
+            const featureToggle = new RewiredFeatureToggle();
 
-            featureToggle.checkToggle(params).then(() => {
-                expect(params.next.calledOnce).to.equal(false);
-                expect(params.callback.firstCall.args[0].isEnabled).to.equal(false);
-                revert();
-                done();
-            });
+            featureToggle.checkToggle(params);
+
+            expect(params.next.calledOnce).to.equal(true);
+
+            done();
         });
     });
 

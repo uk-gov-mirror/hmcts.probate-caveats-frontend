@@ -4,8 +4,8 @@ nodeEnvironment: NODE_ENV
 gitRevision: GIT_REVISION
 externalHostNameUrl: EXTERNAL_HOSTNAME_URL
 featureToggles:
-  url: FEATURE_TOGGLES_API_URL
-  path: FEATURE_TOGGLES_PATH
+  enabled: LAUNCHDARKLY_ENABLED
+  launchDarklyKey: LAUNCHDARKLY_KEY
 app:
   useHttps: USE_HTTPS
   port: PORT
@@ -13,7 +13,7 @@ app:
 services:
   postcode:
     token: POSTCODE_SERVICE_TOKEN
-  orchestration:
+  orchestrator:
     url: ORCHESTRATION_SERVICE_URL
   idam:
     apiUrl: IDAM_API_URL
@@ -33,6 +33,9 @@ services:
     url: PERSISTENCE_SERVICE_URL
   feesRegister:
     url: FEES_REGISTRY_URL
+  equalityAndDiversity:
+    url: EQUALITY_URL
+    tokenKey: PROBATE_TOKEN_KEY
 redis:
   host: REDIS_HOST
   port: REDIS_PORT
@@ -41,7 +44,6 @@ redis:
   enabled: USE_REDIS
   secret: REDIS_SECRET
 hostname: FRONTEND_HOSTNAME
-gaTrackingId: GA_TRACKING_ID
 enableTracking: ENABLE_TRACKING
 webChat:
   chatId: WEBCHAT_CHAT_ID
@@ -57,7 +59,6 @@ utils:
     retries: RETRIES_NUMBER
     retryDelay: RETRY_DELAY
 payment:
-  applicationFeeCode: APPLICATION_FEE_CODE
   serviceId: SERVICE_ID
   siteId: SITE_ID
   version: version
@@ -76,4 +77,4 @@ postcodeLookup:
 validation:
   url: TEST_VALIDATION_SERVICE_URL
 pact:
-  pactBrokerUrl: PACT_BROKER_URL 
+  pactBrokerUrl: PACT_BROKER_URL

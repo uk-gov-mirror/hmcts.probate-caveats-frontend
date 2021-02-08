@@ -1,6 +1,7 @@
-'use strict';
-
+// eslint-disable-line max-lines
 /* eslint no-console: 0 no-unused-vars: 0 */
+
+'use strict';
 
 const logger = require('app/components/logger');
 const path = require('path');
@@ -17,15 +18,19 @@ const utils = require(`${__dirname}/app/components/utils`);
 const packageJson = require(`${__dirname}/package`);
 const helmet = require('helmet');
 const csrf = require('csurf');
-const healthcheck = require(`${__dirname}/app/healthcheck`);
+const healthcheck = require('@hmcts/nodejs-healthcheck');
+const healthOptions = require('app/utils/healthOptions');
+const FormatUrl = require('app/utils/FormatUrl');
+const os = require('os');
 const fs = require('fs');
 const https = require('https');
 const appInsights = require('applicationinsights');
-const uuidv4 = require('uuid/v4');
-const uuid = uuidv4();
+const {v4: uuidv4} = require('uuid');
+const nonce = uuidv4().replace(/-/g, '');
 const isEmpty = require('lodash').isEmpty;
+const featureToggles = require('app/featureToggles');
 
-exports.init = function(isA11yTest = false, a11yTestSession = {}) {
+exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
     const app = express();
     const port = config.app.port;
     const releaseVersion = packageJson.version;
@@ -53,11 +58,10 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
 
     const globals = {
         currentYear: new Date().getFullYear(),
-        gaTrackingId: config.gaTrackingId,
         enableTracking: config.enableTracking,
         links: config.links,
         applicationFee: config.payment.applicationFee,
-        nonce: uuid,
+        nonce: nonce,
         basePath: config.app.basePath,
         webChat: {
             chatId: config.webChat.chatId,
@@ -80,32 +84,54 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
     app.use(helmet.contentSecurityPolicy({
         directives: {
             defaultSrc: ['\'self\''],
-            fontSrc: ['\'self\' data:'],
+            fontSrc: [
+                '\'self\' data:',
+                'fonts.gstatic.com'
+            ],
             scriptSrc: [
                 '\'self\'',
                 '\'sha256-+6WnXIl4mbFTCARd8N3COQmT3bJJmo32N8q8ZSQAIcU=\'',
                 '\'sha256-AaA9Rn5LTFZ5vKyp3xOfFcP4YbyOjvWn2up8IKHVAKk=\'',
                 '\'sha256-G29/qSW/JHHANtFhlrZVDZW1HOkCDRc78ggbqwwIJ2g=\'',
                 'www.google-analytics.com',
+                'www.googletagmanager.com',
                 'vcc-eu4.8x8.com',
                 'vcc-eu4b.8x8.com',
-                `'nonce-${uuid}'`
+                `'nonce-${nonce}'`,
+                'webchat-client.ctsc.hmcts.net'
             ],
-            connectSrc: ['\'self\''],
-            mediaSrc: ['\'self\''],
+            connectSrc: [
+                '\'self\'',
+                'www.google-analytics.com',
+                'stats.g.doubleclick.net',
+                'tagmanager.google.com',
+                'https://webchat.ctsc.hmcts.net',
+                'wss://webchat.ctsc.hmcts.net'
+            ],
+            mediaSrc: [
+                '\'self\''
+            ],
             frameSrc: [
                 'vcc-eu4.8x8.com',
                 'vcc-eu4b.8x8.com'
             ],
             imgSrc: [
                 '\'self\'',
+                '\'self\' data:',
                 'www.google-analytics.com',
+                'stats.g.doubleclick.net',
                 'vcc-eu4.8x8.com',
-                'vcc-eu4b.8x8.com'
+                'vcc-eu4b.8x8.com',
+                'ssl.gstatic.com',
+                'www.gstatic.com',
+                'lh3.googleusercontent.com'
             ],
             styleSrc: [
                 '\'self\'',
-                '\'unsafe-inline\''
+                '\'unsafe-inline\'',
+                'tagmanager.google.com',
+                'fonts.googleapis.com',
+                'webchat-client.ctsc.hmcts.net'
             ],
             frameAncestors: ['\'self\'']
         },
@@ -138,6 +164,7 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
     app.use('/public/javascripts', express.static(`${__dirname}/app/assets/javascripts`, caching));
     app.use('/public/pdf', express.static(`${__dirname}/app/assets/pdf`));
     app.use('/assets', express.static(`${__dirname}/node_modules/govuk-frontend/govuk/assets`, caching));
+    app.use('/public/locales', express.static(`${__dirname}/app/assets/locales`, caching));
 
     // Elements refers to icon folder instead of images folder
     app.use(favicon(path.join(__dirname, 'node_modules', 'govuk-frontend', 'govuk', 'assets', 'images', 'favicon.ico')));
@@ -191,8 +218,12 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
             req.session.language = 'en';
         }
 
-        if (req.query && req.query.locale && config.languages.includes(req.query.locale)) {
-            req.session.language = req.query.locale;
+        if (req.query) {
+            if (req.query.lng && config.languages.includes(req.query.lng)) {
+                req.session.language = req.query.lng;
+            } else if (req.query.locale && config.languages.includes(req.query.locale)) {
+                req.session.language = req.query.locale;
+            }
         }
 
         if (isA11yTest && !isEmpty(a11yTestSession)) {
@@ -210,7 +241,7 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
     }
 
     // Add variables that are available in all views
-    app.use(function (req, res, next) {
+    app.use((req, res, next) => {
         const commonContent = require(`app/resources/${req.session.language}/translation/common`);
 
         res.locals.serviceName = commonContent.serviceName;
@@ -224,12 +255,28 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
         app.use(utils.forceHttps);
     }
 
-    app.use('/health', healthcheck);
+    // health
+    const healthCheckConfig = {
+        checks: {
+            [config.services.orchestrator.name]: healthcheck.web(FormatUrl.format(config.services.orchestrator.url, config.endpoints.health), healthOptions),
+        },
+        buildInfo: {
+            name: config.health.service_name,
+            host: os.hostname(),
+            uptime: process.uptime(),
+        },
+    };
 
-    app.use(`${config.app.basePath}/health`, healthcheck);
+    healthcheck.addTo(app, healthCheckConfig);
+    app.get(`${config.app.basePath}/health`, healthcheck.configure(healthCheckConfig));
+    app.get(`${config.app.basePath}/health/liveness`, (req, res) => res.json({status: 'UP'}));
 
-    app.use(`${config.livenessEndpoint}`, (req, res) => {
-        res.json({status: 'UP'});
+    app.use((req, res, next) => {
+        res.locals.launchDarkly = {};
+        if (ftValue) {
+            res.locals.launchDarkly.ftValue = ftValue;
+        }
+        next();
     });
 
     app.use(`${config.app.basePath}/`, (req, res, next) => {
@@ -239,6 +286,8 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}) {
         req.session.regId = req.query.id || req.session.regId || req.sessionID;
         next();
     }, routes);
+
+    app.use(featureToggles);
 
     // Start the app
     let http;

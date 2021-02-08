@@ -17,6 +17,7 @@ const submitData = (ctx, formdata) => {
     body.deceased.lastName = formdata.deceased.lastName;
 
     body.deceased.address = formdata.deceased.address;
+    body.deceased.alias = formdata.deceased.alias;
 
     body.deceased.dod_date = dateformat(formdata.deceased['dod-date'], 'yyyy-mm-dd');
 
@@ -46,6 +47,11 @@ const submitData = (ctx, formdata) => {
 
     body.language = {};
     body.language.bilingual = formdata.language.bilingual;
+
+    if (formdata.equality) {
+        body.equality = {};
+        body.equality.pcqId = formdata.equality.pcqId;
+    }
 
     return body;
 };

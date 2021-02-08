@@ -11,7 +11,7 @@ const initSteps = require('app/core/initSteps');
 const steps = initSteps([`${__dirname}/../../app/steps/action/`, `${__dirname}/../../app/steps/ui`], 'en');
 
 class TestWrapper {
-    constructor(stepName) {
+    constructor(stepName, ftValue) {
         this.pageToTest = steps[stepName];
         this.pageUrl = this.pageToTest.constructor.getUrl();
 
@@ -30,7 +30,7 @@ class TestWrapper {
         });
 
         config.app.useCSRFProtection = 'false';
-        this.server = app.init();
+        this.server = app.init(false, {}, ftValue);
         this.agent = request.agent(this.server.app);
     }
 
@@ -59,6 +59,15 @@ class TestWrapper {
             .catch(() => done());
     }
 
+    testContentPresent(done, data) {
+        this.agent.get(this.pageUrl)
+            .then(response => {
+                this.assertContentIsPresent(response.text, data);
+                done();
+            })
+            .catch((err) => done(err));
+    }
+
     testContentNotPresent(done, data) {
         this.agent.get(this.pageUrl)
             .then(response => {
@@ -79,8 +88,7 @@ class TestWrapper {
             .expect('Content-type', 'text/html; charset=utf-8')
             .then(res => {
                 forEach(expectedErrors, (value) => {
-                    expect(res.text).to.contain(value[type].summary);
-                    expect(res.text).to.contain(value[type].message);
+                    expect(res.text).to.contain(value[type]);
                 });
                 done();
             })
