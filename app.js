@@ -1,6 +1,7 @@
-'use strict';
-
+// eslint-disable-line max-lines
 /* eslint no-console: 0 no-unused-vars: 0 */
+
+'use strict';
 
 const logger = require('app/components/logger');
 const path = require('path');
@@ -17,15 +18,17 @@ const utils = require(`${__dirname}/app/components/utils`);
 const packageJson = require(`${__dirname}/package`);
 const helmet = require('helmet');
 const csrf = require('csurf');
-const healthcheck = require(`${__dirname}/app/healthcheck`);
+const healthcheck = require('@hmcts/nodejs-healthcheck');
+const healthOptions = require('app/utils/healthOptions');
+const FormatUrl = require('app/utils/FormatUrl');
+const os = require('os');
 const fs = require('fs');
 const https = require('https');
 const appInsights = require('applicationinsights');
-const uuidv4 = require('uuid/v4');
-const nonce = uuidv4();
+const {v4: uuidv4} = require('uuid');
+const nonce = uuidv4().replace(/-/g, '');
 const isEmpty = require('lodash').isEmpty;
 const featureToggles = require('app/featureToggles');
-const LaunchDarkly = require('launchdarkly-node-server-sdk');
 
 exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
     const app = express();
@@ -81,32 +84,54 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
     app.use(helmet.contentSecurityPolicy({
         directives: {
             defaultSrc: ['\'self\''],
-            fontSrc: ['\'self\' data:'],
+            fontSrc: [
+                '\'self\' data:',
+                'fonts.gstatic.com'
+            ],
             scriptSrc: [
                 '\'self\'',
                 '\'sha256-+6WnXIl4mbFTCARd8N3COQmT3bJJmo32N8q8ZSQAIcU=\'',
                 '\'sha256-AaA9Rn5LTFZ5vKyp3xOfFcP4YbyOjvWn2up8IKHVAKk=\'',
                 '\'sha256-G29/qSW/JHHANtFhlrZVDZW1HOkCDRc78ggbqwwIJ2g=\'',
                 'www.google-analytics.com',
+                'www.googletagmanager.com',
                 'vcc-eu4.8x8.com',
                 'vcc-eu4b.8x8.com',
-                `'nonce-${nonce}'`
+                `'nonce-${nonce}'`,
+                'webchat-client.ctsc.hmcts.net'
             ],
-            connectSrc: ['\'self\''],
-            mediaSrc: ['\'self\''],
+            connectSrc: [
+                '\'self\'',
+                'www.google-analytics.com',
+                'stats.g.doubleclick.net',
+                'tagmanager.google.com',
+                'https://webchat.ctsc.hmcts.net',
+                'wss://webchat.ctsc.hmcts.net'
+            ],
+            mediaSrc: [
+                '\'self\''
+            ],
             frameSrc: [
                 'vcc-eu4.8x8.com',
                 'vcc-eu4b.8x8.com'
             ],
             imgSrc: [
                 '\'self\'',
+                '\'self\' data:',
                 'www.google-analytics.com',
+                'stats.g.doubleclick.net',
                 'vcc-eu4.8x8.com',
-                'vcc-eu4b.8x8.com'
+                'vcc-eu4b.8x8.com',
+                'ssl.gstatic.com',
+                'www.gstatic.com',
+                'lh3.googleusercontent.com'
             ],
             styleSrc: [
                 '\'self\'',
-                '\'unsafe-inline\''
+                '\'unsafe-inline\'',
+                'tagmanager.google.com',
+                'fonts.googleapis.com',
+                'webchat-client.ctsc.hmcts.net'
             ],
             frameAncestors: ['\'self\'']
         },
@@ -139,6 +164,7 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
     app.use('/public/javascripts', express.static(`${__dirname}/app/assets/javascripts`, caching));
     app.use('/public/pdf', express.static(`${__dirname}/app/assets/pdf`));
     app.use('/assets', express.static(`${__dirname}/node_modules/govuk-frontend/govuk/assets`, caching));
+    app.use('/public/locales', express.static(`${__dirname}/app/assets/locales`, caching));
 
     // Elements refers to icon folder instead of images folder
     app.use(favicon(path.join(__dirname, 'node_modules', 'govuk-frontend', 'govuk', 'assets', 'images', 'favicon.ico')));
@@ -192,8 +218,12 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
             req.session.language = 'en';
         }
 
-        if (req.query && req.query.locale && config.languages.includes(req.query.locale)) {
-            req.session.language = req.query.locale;
+        if (req.query) {
+            if (req.query.lng && config.languages.includes(req.query.lng)) {
+                req.session.language = req.query.lng;
+            } else if (req.query.locale && config.languages.includes(req.query.locale)) {
+                req.session.language = req.query.locale;
+            }
         }
 
         if (isA11yTest && !isEmpty(a11yTestSession)) {
@@ -225,26 +255,28 @@ exports.init = function(isA11yTest = false, a11yTestSession = {}, ftValue) {
         app.use(utils.forceHttps);
     }
 
-    app.use(healthcheck);
+    // health
+    const healthCheckConfig = {
+        checks: {
+            [config.services.orchestrator.name]: healthcheck.web(FormatUrl.format(config.services.orchestrator.url, config.endpoints.health), healthOptions),
+        },
+        buildInfo: {
+            name: config.health.service_name,
+            host: os.hostname(),
+            uptime: process.uptime(),
+        },
+    };
 
-    app.use(`${config.app.basePath}/health`, healthcheck);
-
-    app.use(`${config.livenessEndpoint}`, (req, res) => {
-        res.json({status: 'UP'});
-    });
+    healthcheck.addTo(app, healthCheckConfig);
+    app.get(`${config.app.basePath}/health`, healthcheck.configure(healthCheckConfig));
+    app.get(`${config.app.basePath}/health/liveness`, (req, res) => res.json({status: 'UP'}));
+    app.get(`${config.app.basePath}/health/readiness`, (req, res) => res.json({status: 'UP'}));
 
     app.use((req, res, next) => {
-        if (['test', 'testing'].includes(app.get('env'))) {
-            res.locals.launchDarkly = {
-                client: LaunchDarkly.init(config.featureToggles.launchDarklyKey, {offline: true}),
-                ftValue: ftValue
-            };
-        } else {
-            res.locals.launchDarkly = {
-                client: LaunchDarkly.init(config.featureToggles.launchDarklyKey)
-            };
+        res.locals.launchDarkly = {};
+        if (ftValue) {
+            res.locals.launchDarkly.ftValue = ftValue;
         }
-
         next();
     });
 

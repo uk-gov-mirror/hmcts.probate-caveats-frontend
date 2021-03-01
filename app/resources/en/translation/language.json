@@ -3,12 +3,10 @@
   "question": "Do you require your correspondence in English and Welsh?",
   "optionYes": "Yes",
   "optionNo": "No",
+  "hiddenSummaryText": "applicant's correspondence language",
   "errors": {
     "bilingual": {
-      "required": {
-        "summary": "You need to choose whether you require bilingual (English/Welsh) correspondence or English correspondence",
-        "message": "Answer &lsquo;yes&rsquo; if you require bilingual (English/Welsh) correspondence"
-      }
+      "required": "Answer &lsquo;yes&rsquo; if you require bilingual (English/Welsh) correspondence"
     }
   }
 }

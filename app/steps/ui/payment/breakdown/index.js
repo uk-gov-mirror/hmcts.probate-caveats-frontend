@@ -46,7 +46,7 @@ class PaymentBreakdown extends Step {
         this.nextStepUrl = () => this.next(ctx).constructor.getUrl();
 
         try {
-            const feesLookup = new FeesLookup(formdata.applicationId, hostname);
+            const feesLookup = new FeesLookup(formdata.applicationId, session, hostname);
             const confirmFees = yield feesLookup.lookup(ctx.authToken);
             this.checkFeesStatus(confirmFees);
             const originalFees = formdata.fees;
@@ -55,6 +55,8 @@ class PaymentBreakdown extends Step {
             }
             ctx.total = originalFees.total;
             ctx.applicationFee = originalFees.total;
+            ctx.applicationversion = confirmFees.applicationversion;
+            ctx.applicationcode = confirmFees.applicationcode;
 
             // Setup security tokens
             yield this.setCtxWithSecurityTokens(ctx, errors, session.language);
@@ -83,7 +85,9 @@ class PaymentBreakdown extends Step {
                 copies: ctx.copies,
                 deceasedLastName: ctx.deceasedLastName,
                 ccdCaseId: ccdCaseId,
-                applicationId: ctx.applicationId
+                applicationId: ctx.applicationId,
+                version: ctx.applicationversion,
+                code: ctx.applicationcode
             };
             const paymentResponse = yield services.createPayment(data, hostname, session.language);
             logInfo(`New Payment reference: ${paymentResponse.reference}`, formdata.applicationId);

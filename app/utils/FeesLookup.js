@@ -3,20 +3,16 @@
 const services = require('app/components/services');
 const logger = require('app/components/logger');
 const logInfo = (message, applicationId = 'Init') => logger(applicationId).info(message);
+const FeatureToggle = require('app/utils/FeatureToggle');
+const config = require('config');
 
 class FeesLookup {
 
-    constructor(applicationId) {
+    constructor(applicationId, session) {
         this.applicationId = applicationId;
-        this.data = {
-            applicant_type: 'all',
-            channel: 'default',
-            event: 'miscellaneous',
-            jurisdiction1: 'family',
-            jurisdiction2: 'probate registry',
-            keyword: 'MNO',
-            service: 'probate'
-        };
+        this.data = FeatureToggle.isEnabled(session.featureToggles, 'ft_newfee_register_code')?config.services.feesRegister.caveat_newfee_data: config.services.feesRegister.caveat_fee_data;
+        logInfo(`Fee data from config: ${JSON.stringify(this.data)}`);
+        this.data = config.services.feesRegister.caveat_newfee_data;
     }
 
     lookup(authToken) {
@@ -27,6 +23,8 @@ class FeesLookup {
 const createCall = async (applicationId, data, authToken) => {
     const fees = {
         status: 'success',
+        applicationversion: 0,
+        applicationcode: '',
         total: 0
     };
     logInfo(`Sending fee request to api with the following payload: ${JSON.stringify(data)}`, applicationId);
@@ -36,6 +34,8 @@ const createCall = async (applicationId, data, authToken) => {
                 fees.status = 'failed';
             } else {
                 fees.total = res.fee_amount;
+                fees.applicationversion = res.version;
+                fees.applicationcode = res.code;
             }
         });
     return fees;

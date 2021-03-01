@@ -1,4 +1,7 @@
 {
+    "equality": {
+        "pcqId": "df28c61f-b388-489b-a67a-847423dd7ac4"
+    },
     "language": {
         "bilingual": "optionYes"
     },
@@ -23,6 +26,7 @@
         "dod_date": "2018-11-20",
         "firstName": "Mike",
         "lastName": "Samuels",
+        "alias": "optionYes",
         "otherNames": {
             "name_0": {
                 "firstName": "King",
@@ -31,7 +35,7 @@
         }
     },
     "payments": [{
-        "total": 20
+        "total": 3
     }],
     "registry": {
         "name": "Birmingham"

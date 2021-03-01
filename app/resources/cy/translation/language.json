@@ -3,12 +3,10 @@
   "question": "Ydych chi eisiau gohebiaeth ddwyieithog (Cymraeg/Saesneg)",
   "optionYes": "Ydw",
   "optionNo": "Nac ydw",
+  "hiddenSummaryText": "iaith ohebiaeth y ceisydd",
   "errors": {
     "bilingual": {
-      "required": {
-        "summary": "Mae angen ichi ddewis os ydych chi eisiau gohebiaeth ddwyieithog (Cymraeg/Saesneg) neu ohebiaeth Saesneg yn unig",
-        "message": "Atebwch &lsquo;ydw&rsquo; os ydych chi eisiau gohebiaeth ddwyieithog (Cymraeg/Saesneg)"
-      }
+      "required": "Atebwch &lsquo;ydw&rsquo; os ydych chi eisiau gohebiaeth ddwyieithog (Cymraeg/Saesneg)"
     }
   }
 }

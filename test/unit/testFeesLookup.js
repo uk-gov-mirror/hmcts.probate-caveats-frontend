@@ -8,6 +8,7 @@ const utils = require('app/components/api-utils');
 const services = require('app/components/services');
 
 describe('FeesLookup', () => {
+
     describe('lookup()', () => {
         let feesLookup;
         let servicesMock;
@@ -15,7 +16,10 @@ describe('FeesLookup', () => {
         let authToken;
 
         beforeEach(() => {
-            feesLookup = new FeesLookup('dummyApplicantId', 'dummyHostname');
+            const session = {
+                featureToggles: {'ft_newfee_register_code': false}
+            };
+            feesLookup = new FeesLookup('dummyApplicantId', session, 'dummyHostname');
             servicesMock = sinon.mock(services);
             fetchJsonStub = sinon.stub(utils, 'fetchJson');
             authToken = 'dummyToken';
@@ -26,14 +30,53 @@ describe('FeesLookup', () => {
             fetchJsonStub.restore();
         });
 
+        it('should lookup caveats fees with correct keyword MNO when feature toggle is off', (done) => {
+            const current_fee_data = {
+                applicant_type: 'all',
+                channel: 'default',
+                event: 'miscellaneous',
+                jurisdiction1: 'family',
+                jurisdiction2: 'probate registry',
+                keyword: 'Caveat',
+                service: 'probate'
+            };
+
+            expect(feesLookup.data).to.deep.equal(current_fee_data);
+            done();
+        });
+
+        it('should lookup caveats fees with correct keyword Caveats when feature toggle is on', (done) => {
+            const newfee_data = {
+                applicant_type: 'all',
+                channel: 'default',
+                event: 'miscellaneous',
+                jurisdiction1: 'family',
+                jurisdiction2: 'probate registry',
+                keyword: 'Caveat',
+                service: 'probate'
+            };
+
+            const session = {
+                featureToggles: {'ft_newfee_register_code': true}
+            };
+
+            feesLookup = new FeesLookup('dummyApplicantId', session, 'dummyHostname');
+            expect(feesLookup.data).to.deep.equal(newfee_data);
+            done();
+        });
+
         it('should lookup caveats fees', (done) => {
             servicesMock.expects('feesLookup').returns(Promise.resolve({
-                'fee_amount': 20
+                fee_amount: 3,
+                version: 0,
+                code: 'FEE0288'
             }));
 
             const expectedResponse = {
                 status: 'success',
-                total: 20
+                applicationversion: 0,
+                applicationcode: 'FEE0288',
+                total: 3
             };
 
             fetchJsonStub.returns(Promise.resolve(''));
@@ -53,6 +96,8 @@ describe('FeesLookup', () => {
 
             const expectedResponse = {
                 status: 'failed',
+                applicationversion: 0,
+                applicationcode: '',
                 total: 0
             };
 

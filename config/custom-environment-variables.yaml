@@ -4,6 +4,7 @@ nodeEnvironment: NODE_ENV
 gitRevision: GIT_REVISION
 externalHostNameUrl: EXTERNAL_HOSTNAME_URL
 featureToggles:
+  enabled: LAUNCHDARKLY_ENABLED
   launchDarklyKey: LAUNCHDARKLY_KEY
 app:
   useHttps: USE_HTTPS
@@ -12,7 +13,7 @@ app:
 services:
   postcode:
     token: POSTCODE_SERVICE_TOKEN
-  orchestration:
+  orchestrator:
     url: ORCHESTRATION_SERVICE_URL
   idam:
     apiUrl: IDAM_API_URL
@@ -34,6 +35,7 @@ services:
     url: FEES_REGISTRY_URL
   equalityAndDiversity:
     url: EQUALITY_URL
+    tokenKey: PROBATE_TOKEN_KEY
 redis:
   host: REDIS_HOST
   port: REDIS_PORT
@@ -57,7 +59,6 @@ utils:
     retries: RETRIES_NUMBER
     retryDelay: RETRY_DELAY
 payment:
-  applicationFeeCode: APPLICATION_FEE_CODE
   serviceId: SERVICE_ID
   siteId: SITE_ID
   version: version

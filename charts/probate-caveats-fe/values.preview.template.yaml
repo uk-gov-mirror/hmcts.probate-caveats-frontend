@@ -5,8 +5,10 @@ nodejs:
     REDIS_USE_TLS: false
     REDIS_HOST: ${SERVICE_NAME}-redis-master
     REDIS_PORT: 6379
+    LAUNCHDARKLY_ENABLED: false
   keyVaults:
     probate:
+      resourceGroup: probate
       secrets:
         - idam-s2s-secret
         - ccidam-idam-api-secrets-probate
@@ -14,7 +16,6 @@ nodejs:
         - postcode-service-token2
         - probate-survey
         - probate-survey-end
-        - probate-application-fee-code
         - probate-service-id
         - probate-site-id
         - caveat-user-name

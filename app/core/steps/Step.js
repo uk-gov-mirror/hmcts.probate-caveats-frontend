@@ -52,8 +52,10 @@ class Step {
         let ctx = {};
         Object.assign(ctx, session.form[this.section] || {});
         ctx.sessionID = req.sessionID;
+        ctx.language = req.session.language ? req.session.language : 'en';
         ctx = Object.assign(ctx, req.body);
         ctx = FeatureToggle.appwideToggles(req, ctx, config.featureToggles.appwideToggles);
+        ctx.isAvayaWebChatEnabled = ctx.featureToggles && ctx.featureToggles.ft_avaya_webchat && ctx.featureToggles.ft_avaya_webchat === 'true';
 
         return ctx;
     }
@@ -93,9 +95,9 @@ class Step {
     generateFields(language, ctx, errors) {
         let fields = mapValues(ctx, (value, key) => {
             let returnValue;
+            const dateName = key.split('-')[0];
 
-            if (key.includes('formattedDate')) {
-                const dateName = key.split('-')[0];
+            if (key.includes('formattedDate') && ctx[`${dateName}-day`] && ctx[`${dateName}-month`] && ctx[`${dateName}-year`]) {
                 const date = moment(ctx[`${dateName}-day`] + '/' + ctx[`${dateName}-month`] + '/' + ctx[`${dateName}-year`], config.dateFormat).parseZone();
                 returnValue = utils.formattedDate(date, language);
             } else {
